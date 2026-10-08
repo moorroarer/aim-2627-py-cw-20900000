@@ -353,7 +353,107 @@ class SentryState(Enum):
 def decide(sensor, state, hp, heat):
     """TODO(Q5)：纯函数决策，返回 (action: str, new_state: SentryState)；
     sensor 字段契约、R1-R7 规则表与非法输入处理见题面 Q5 规范。"""
-    raise NotImplementedError("Q5 decide：题面 Q5·决策规则表 R1-R7")
+    if not isinstance(sensor, dict):
+        raise ValueError("sensor 必须是 dict")
+
+    required_fields = ("enemy_frames", "enemy_dist", "robot_type", "max_hp")
+    for field in required_fields:
+        if field not in sensor:
+            raise ValueError(f"缺少必要字段: {field}")
+
+    if not isinstance(state, SentryState):
+        raise ValueError("state 必须是 SentryState 成员")
+
+    frames = sensor["enemy_frames"]
+    if not isinstance(frames, (list, tuple)) or len(frames) == 0 or len(frames) > 6:
+        raise ValueError("enemy_frames 必须是非空且长度不超过 6 的序列")
+
+    frames = [bool(f) for f in frames]
+    visible = frames[-1]
+    confirmed = len(frames) >= 2 and frames[-2] and frames[-1]
+
+    lost_streak = 0
+    for f in reversed(frames):
+        if f:
+            break
+        lost_streak += 1
+
+    enemy_dist = sensor["enemy_dist"]
+    if (not isinstance(enemy_dist, (int, float))
+            or isinstance(enemy_dist, bool)
+            or enemy_dist < 0):
+        enemy_dist = float("inf")
+    else:
+        try:
+            enemy_dist = int(enemy_dist)
+        except (ValueError, OverflowError):
+            enemy_dist = float("inf")
+
+    robot_type = sensor["robot_type"]
+    if not isinstance(robot_type, str) or robot_type not in ("HERO", "INFANTRY"):
+        robot_type = "INFANTRY"
+
+    max_hp = sensor["max_hp"]
+    if (not isinstance(max_hp, (int, float))
+            or isinstance(max_hp, bool)
+            or max_hp <= 0):
+        max_hp = 1
+    try:
+        max_hp = max(1, int(max_hp))
+    except (ValueError, OverflowError):
+        max_hp = 1
+
+    if (not isinstance(hp, (int, float))
+            or isinstance(hp, bool)
+            or hp < 0):
+        hp = 0
+
+    try:
+        hp = max(0, min(max_hp, int(hp)))
+    except (ValueError, OverflowError):
+        hp = 0
+    hp_pct = hp_ratio(hp, max_hp)
+
+    if hp_pct <= 30:
+        return "RETREAT", SentryState.RETREAT
+
+    if state == SentryState.RETREAT:
+        # Provisional recovery threshold; confirm with the course staff.
+        if hp_pct >= 80:
+            return "RETURN", SentryState.RETURN
+        return "RETREAT", SentryState.RETREAT
+
+    if state == SentryState.RETURN:
+        return "MOVE_BASE", SentryState.PATROL
+
+    if state == SentryState.ENGAGE:
+        if visible:
+            if enemy_dist <= 3:
+                return "SHOOT", SentryState.ENGAGE
+            if robot_type == "HERO":
+                return "MOVE_RIGHT", SentryState.ENGAGE
+            return "MOVE_LEFT", SentryState.ENGAGE
+        else:
+            # 持续丢失阈值暂定 3，题面未明确给出具体数值
+            if lost_streak >= 3:
+                return "SCAN", SentryState.SUSPECT
+            return "HOLD_FIRE", SentryState.ENGAGE
+
+    if state in (SentryState.PATROL, SentryState.SUSPECT):
+        if visible:
+            if confirmed:
+                if enemy_dist <= 3:
+                    return "SHOOT", SentryState.ENGAGE
+                if robot_type == "HERO":
+                    return "MOVE_RIGHT", SentryState.ENGAGE
+                return "MOVE_LEFT", SentryState.ENGAGE
+            return "SCAN", SentryState.SUSPECT
+        else:
+            if state == SentryState.PATROL:
+                return "PATROL_MOVE", SentryState.PATROL
+            return "SCAN", SentryState.SUSPECT
+
+    return "SCAN", SentryState.SUSPECT
 
 
 # ---------------------------------------------------------------------------
