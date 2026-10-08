@@ -81,7 +81,98 @@ def status_report(name, robot_type, hp, max_hp, battery):
 def analyze_damage_log(lines):
     """TODO(Q2)：解析混合格式伤害日志，返回固定契约的统计 dict；
     行格式、去重与统计口径见题面 Q2 规范。"""
-    raise NotImplementedError("Q2 analyze_damage_log：题面 Q2·多源日志解析与统计")
+    by_armor = {"front": 0, "left": 0, "right": 0}
+    total = 0
+    count = 0
+    seen_ids = set()
+
+    armor_map = {
+        "F": "front",
+        "L": "left",
+        "R": "right",
+    }
+    for raw in lines:
+        if not isinstance(raw, str):
+            continue
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        events = []
+        json_id = None
+        has_json_id = False
+        if line.startswith("{"):
+            try:
+                data = json.loads(line)
+            except (ValueError, RecursionError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            armor = data.get("armor")
+            damage = data.get("damage")
+            if not isinstance(armor, str) or armor not in by_armor:
+                continue
+            if type(damage) is not int or damage <= 0:
+                continue
+            if "id" in data:
+                json_id = data["id"]
+                try:
+                    hash(json_id)
+                except TypeError:
+                    continue
+                if json_id in seen_ids:
+                    continue
+                has_json_id = True
+            events.append((armor, damage))
+        else:
+            valid = True
+            parts = line.split(",")
+            for part in parts:
+                pieces = part.split(":")
+                if len(pieces) != 2:
+                    valid = False
+                    break
+                key, value_text = (piece.strip() for piece in pieces)
+                if key not in armor_map:
+                    valid = False
+                    break
+                if not value_text or not all(
+                        "0" <= ch <= "9" for ch in value_text):
+                    valid = False
+                    break
+                try:
+                    damage = int(value_text)
+                except ValueError:
+                    valid = False
+                    break
+                if damage <= 0:
+                    valid = False
+                    break
+                events.append((armor_map[key], damage))
+            if not valid:
+                continue
+        if has_json_id:
+            seen_ids.add(json_id)
+        for armor, damage in events:
+            by_armor[armor] += damage
+            total += damage
+            count += 1
+    if count == 0:
+        most_hit = None
+        avg = 0.0
+    else:
+        avg = round(total/count, 2)
+
+        most_hit = "front"
+        if by_armor["left"] > by_armor[most_hit]:
+            most_hit = "left"
+        if by_armor["right"] > by_armor[most_hit]:
+            most_hit = "right"
+    return {
+        "total": total,
+        "by_armor": by_armor,
+        "most_hit": most_hit,
+        "avg": avg
+    }
 
 
 # ---------------------------------------------------------------------------
