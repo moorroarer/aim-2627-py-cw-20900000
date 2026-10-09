@@ -29,7 +29,7 @@ def total_route_meters(points):
     points 为检查点序列 [(x, y), ...]，至少两个点。"""
     distance_in_meters = 0
     for i in range(len(points) - 1):
-        distance_in_meters += segment_length_cm(points[i], points[i + 1])
+        distance_in_meters += segment_length_cm(points[i], points[i + 1]) / 100
     return distance_in_meters
 
 
@@ -39,12 +39,18 @@ def total_route_meters(points):
 def parse_event(line):
     """解析一行事件日志，形如 "MOVE,3" / "SCAN,0" / "IDLE,1"。
     合法返回 {"type": str, "count": int}；脏行返回 None（不得抛异常）。"""
+    if not isinstance(line, str):
+        return None
     parts = line.strip().split(",")
     if len(parts) != 2 or parts[0] not in ("MOVE", "SCAN", "IDLE"):
         return None
     if not parts[1].isdigit():
         return None
-    return {"type": parts[0], "count": int(parts[1])}
+    try:
+        count = int(parts[1])
+    except ValueError:
+        return None
+    return {"type": parts[0], "count": count}
 
 
 def first_positive(samples):
@@ -59,6 +65,8 @@ def calibrate(samples):
     """以第一个正样本为基线计算累计漂移：sum(s - baseline)。
     样本为空或没有正样本时，漂移为 0。"""
     baseline = first_positive(samples)
+    if baseline is None:
+        return 0
     drift = 0
     for s in samples:
         drift += s - baseline
@@ -75,15 +83,17 @@ def summarize_events(events, max_id):
     used = 0
     steps = 0
     for e in events:
-        if e["id"] < max_id:
+        if e["id"] <= max_id:
             used += 1
             steps += e["move"] + calibrate(e["samples"])
     return {"events": used, "steps": steps}
 
 
-def log(message, history=[]):
+def log(message, history=None):
     """向历史追加一条日志并返回整个历史列表。
     不显式传入 history 时，每次调用都从空历史开始。"""
+    if history is None:
+        history = []
     history.append(message)
     return history
 
@@ -109,6 +119,7 @@ def run_legacy_sim(rounds, stamina_start=100):
         if round_ >= 3:
             stamina -= 5
         trace.append((round_, stamina))
-        if stamina > 20:
+        round_ += 1
+        if stamina <= 20:
             break
     return {"rounds": len(trace), "stamina": stamina, "trace": trace}
