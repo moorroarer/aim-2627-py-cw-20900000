@@ -112,14 +112,14 @@ CI 只允许修改 `src/main/**`、`README.md` 与 `.agent-sessions/**`（AI 会
 ### 当前完成情况
 
 - Q1–Q5 已实现并分别保存为本地提交。实现和上述边界选择仍需接受隐藏测试与人工评审。
-- Q6 `run_patrol` 仅有草稿：已准备步数、访问集合、碰撞基准和脱困状态，尝试编写方向辅助函数，但尚无任务主循环和统计返回。方向表存在重复键、辅助函数返回整个字典而非对应方向、`tight_turns` 变量拼写等问题，尚未修复，不能作为完成实现使用。
+- Q6 `run_patrol` 尚未完成，已将未完成草稿恢复为 `NotImplementedError` 占位；任务主循环、脱困逻辑和统计返回尚未实现。
 - Q6 `report_to_json` 仍为 `NotImplementedError`；200 张地图的成功率、碰撞及步数比验收尚未完成。
 - Q7 `legacy_patrol.py` 保持课程原始版本，调试任务尚未完成；此前运行全套测试时出现失败与卡住，不能声称全套测试或 CI 已通过。
 - Bonus 的 `bfs_path_length` 尚未实现。
 
 ### 验证范围与局限
 
-- 在加入当前 Q6 草稿之前，运行 `python -m pytest src/tests/test_main.py -ra` 的结果为 **25 passed、3 skipped**，当时格式检查通过。该结果只对应此前 Q1–Q5 的版本，不代表当前 Q6 草稿已验证。
+- 恢复 Q6 未实现占位后，重新运行 `python -m pytest src/tests/test_main.py -ra`，结果为 **25 passed、3 skipped**；`src/main/__init__.py` 的 autopep8 格式检查通过。这仅验证了当前主模块可见测试，不代表 Q6、Q7、Bonus 已完成或完整 CI 已通过。
 - 开发过程中还使用临时检查验证脏行处理、去重、移动和转向、导航候选及决策优先级。这些检查用于确认实现行为，不替代课程隐藏测试，也不证明暂定规则就是标准答案。
 - `skipped` 表示对应功能尚未实现，不等于通过。最终提交前仍需重新检查当前代码的格式、完整测试和 Q6 地图统计。
 
